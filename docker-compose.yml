@@ -1,0 +1,14 @@
+services:
+  myframe:
+    build: .
+    image: myframe:latest
+    container_name: myframe
+    ports:
+      - "8080:8080"
+    volumes:
+      - /volume1/photo:/photos:ro
+      - ./config:/config
+    environment:
+      # How often (minutes) to rescan the photo folders for new images. 0 disables.
+      - RESCAN_INTERVAL_MIN=60
+    restart: unless-stopped
