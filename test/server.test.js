@@ -73,4 +73,36 @@ describe("server", () => {
     const res = await request(app).get("/photo/abc/100");
     expect(res.status).toBe(400);
   });
+
+  it("returns 404 (does not hang) when every indexed file is unreadable", async () => {
+    await request(app).put("/api/settings").send({ folders: ["album"], orientation: "all" });
+    // Corrupt both indexed files on disk so every render fails.
+    await writeFile(join(root, "album", "v.png"), "garbage");
+    await writeFile(join(root, "album", "h.png"), "garbage");
+    const res = await request(app).get("/photo");
+    expect(res.status).toBe(404);
+  });
+
+  it("clamps an oversized default dimension on save", async () => {
+    const res = await request(app)
+      .put("/api/settings")
+      .send({ folders: ["album"], defaultWidth: 999999, defaultHeight: 500 });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.defaultWidth).toBe(8000);
+  });
+
+  it("400 on non-positive default dimension", async () => {
+    const res = await request(app).put("/api/settings").send({ defaultWidth: 0 });
+    expect(res.status).toBe(400);
+  });
+
+  it("400 on out-of-range quality", async () => {
+    const res = await request(app).put("/api/settings").send({ quality: 200 });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects folders that escape the photo root", async () => {
+    const res = await request(app).put("/api/settings").send({ folders: ["../../etc"] });
+    expect(res.status).toBe(400);
+  });
 });

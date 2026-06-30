@@ -1,12 +1,19 @@
 import { readdir } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 
-export async function listSubfolders(root, relative = "") {
+// Resolves `relative` against `root` and throws if the result escapes `root`.
+// Shared guard used by folder listing, indexing, and settings validation.
+export function safeResolve(root, relative = "") {
   const base = resolve(root);
   const target = resolve(base, relative);
   if (target !== base && !target.startsWith(base + sep)) {
     throw new Error("invalid path");
   }
+  return target;
+}
+
+export async function listSubfolders(root, relative = "") {
+  const target = safeResolve(root, relative);
   let entries;
   try {
     entries = await readdir(target, { withFileTypes: true });

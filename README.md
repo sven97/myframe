@@ -40,6 +40,14 @@ Settings persist to `/config/settings.json`:
 `RESCAN_INTERVAL_MIN` (env, default 60) controls how often the index refreshes
 to pick up new files; set `0` to disable the timer and rescan only via the UI.
 
+### HEIC / HEIF photos
+
+`.heic` is listed in the defaults, but `sharp`'s stock prebuilt libvips (used by
+the `node:22-bookworm-slim` base image) ships **without** a HEIF decoder, so
+HEIC files are silently skipped during indexing. iPhone photos are commonly
+HEIC — if your library is mostly HEIC, you'll need a libvips build with HEIF
+support (or convert to JPEG). Track this as a follow-up if you hit it.
+
 ## Develop
 
 ```bash
