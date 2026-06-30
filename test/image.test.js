@@ -28,13 +28,60 @@ describe("renderImage", () => {
     expect(meta.format).toBe("jpeg");
   });
 
-  it("applies EXIF orientation before cropping", async () => {
-    // Stored 200x100 but orientation 6 means display is 100x200 (rotated 90deg).
-    const p = await write("rot.png", await makeImage({ width: 200, height: 100, orientation: 6 }));
-    const out = await renderImage(p, { width: 50, height: 100, format: "jpeg", quality: 80 });
-    const meta = await sharp(out).metadata();
-    expect(meta.width).toBe(50);
-    expect(meta.height).toBe(100);
+  it("applies EXIF orientation before cropping (pixel color check)", async () => {
+    // Source: landscape 200×100, left half RED, right half GREEN, stored with EXIF
+    // orientation 6 (90° CW correction needed).
+    //
+    // After .rotate() the image is portrait 100×200: TOP=RED, BOTTOM=GREEN
+    // (original left→top, original right→bottom under 90° CW).
+    // Rendered to 50×100 PNG with cover: rows 0-49=RED, rows 50-99=GREEN.
+    //
+    // Without .rotate() the source is treated as 200×100 landscape. Cover-cropping
+    // to 50×100 pulls cols 75-124 of center → output cols 0-24=RED, cols 25-49=GREEN
+    // (a left/right split, NOT a top/bottom split).
+    //
+    // Pixel (col=45, row=5):  RED with rotate, GREEN without → discriminating.
+    // Pixel (col=5,  row=90): GREEN with rotate, RED without → discriminating.
+    const leftBuf = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: { r: 255, g: 0, b: 0 } },
+    })
+      .png()
+      .toBuffer();
+    const rightBuf = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: { r: 0, g: 255, b: 0 } },
+    })
+      .png()
+      .toBuffer();
+    const twoTone = await sharp({
+      create: { width: 200, height: 100, channels: 3, background: { r: 0, g: 0, b: 0 } },
+    })
+      .composite([
+        { input: leftBuf, left: 0, top: 0 },
+        { input: rightBuf, left: 100, top: 0 },
+      ])
+      .withMetadata({ orientation: 6 })
+      .png()
+      .toBuffer();
+
+    const p = await write("twotone-rot.png", twoTone);
+    // Use PNG output (lossless) to get precise pixel values.
+    const out = await renderImage(p, { width: 50, height: 100, format: "png", quality: 80 });
+
+    const { data, info } = await sharp(out).raw().toBuffer({ resolveWithObject: true });
+    function getPixel(col, row) {
+      const i = (row * info.width + col) * info.channels;
+      return { r: data[i], g: data[i + 1], b: data[i + 2] };
+    }
+
+    // Top-right area: should be RED after rotation. Without .rotate() this would be GREEN.
+    const topRight = getPixel(45, 5);
+    expect(topRight.r).toBeGreaterThan(200);
+    expect(topRight.g).toBeLessThan(50);
+
+    // Bottom-left area: should be GREEN after rotation. Without .rotate() this would be RED.
+    const bottomLeft = getPixel(5, 90);
+    expect(bottomLeft.g).toBeGreaterThan(200);
+    expect(bottomLeft.r).toBeLessThan(50);
   });
 
   it("can output png", async () => {
@@ -42,5 +89,7 @@ describe("renderImage", () => {
     const out = await renderImage(p, { width: 100, height: 100, format: "png", quality: 80 });
     const meta = await sharp(out).metadata();
     expect(meta.format).toBe("png");
+    expect(meta.width).toBe(100);
+    expect(meta.height).toBe(100);
   });
 });
