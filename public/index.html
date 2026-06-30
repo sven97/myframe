@@ -3,52 +3,126 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MyFrame — Configuration</title>
+    <title>MyFrame — darkroom</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="glow" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="aperture" aria-hidden="true"></span>
+        <div class="brand-text">
+          <h1>MyFrame</h1>
+          <span class="brand-sub">darkroom &middot; photo frame server</span>
+        </div>
+      </div>
+      <div class="status-pill" id="statusPill" data-state="idle">
+        <span class="dot"></span>
+        <span class="status-num" id="statusCount">—</span>
+        <span class="status-label">frames indexed</span>
+      </div>
+    </header>
+
     <main>
-      <h1>MyFrame</h1>
-      <p class="status" id="status">Loading…</p>
+      <div class="col-left">
+        <section class="panel reveal" style="--i: 0">
+          <div class="panel-head">
+            <h2><span class="idx">01</span> Folders</h2>
+            <span class="hint" id="folderHint">loading…</span>
+          </div>
+          <div class="folder-grid" id="folders"></div>
+        </section>
 
-      <section>
-        <h2>Folders</h2>
-        <ul id="folders" class="folders"></ul>
-      </section>
+        <section class="panel reveal" style="--i: 1">
+          <div class="panel-head">
+            <h2><span class="idx">02</span> Filters &amp; Output</h2>
+          </div>
 
-      <section>
-        <h2>Filters &amp; output</h2>
-        <label>Orientation
-          <select id="orientation">
-            <option value="all">All</option>
-            <option value="vertical">Vertical only</option>
-            <option value="horizontal">Horizontal only</option>
-          </select>
-        </label>
-        <label>Default width <input id="defaultWidth" type="number" min="1" /></label>
-        <label>Default height <input id="defaultHeight" type="number" min="1" /></label>
-        <label>Format
-          <select id="format">
-            <option value="jpeg">JPEG</option>
-            <option value="png">PNG</option>
-            <option value="webp">WebP</option>
-          </select>
-        </label>
-        <label>Quality <input id="quality" type="number" min="1" max="100" /></label>
-      </section>
+          <div class="field">
+            <label>Orientation</label>
+            <div class="segmented" id="orientation" role="tablist">
+              <span class="seg-slider" aria-hidden="true"></span>
+              <button class="seg" data-value="all" role="tab">All</button>
+              <button class="seg" data-value="vertical" role="tab">Vertical</button>
+              <button class="seg" data-value="horizontal" role="tab">Horizontal</button>
+            </div>
+          </div>
 
-      <div class="actions">
-        <button id="save">Save &amp; rescan</button>
-        <button id="rescan">Rescan now</button>
+          <div class="field">
+            <label>Default size <span class="sublabel">— match your panel</span></label>
+            <div class="size-row">
+              <input id="defaultWidth" type="number" min="1" inputmode="numeric" />
+              <span class="times">&times;</span>
+              <input id="defaultHeight" type="number" min="1" inputmode="numeric" />
+              <span class="unit">px</span>
+            </div>
+          </div>
+
+          <div class="field-grid">
+            <div class="field">
+              <label>Format</label>
+              <div class="select-wrap">
+                <select id="format">
+                  <option value="jpeg">JPEG</option>
+                  <option value="png">PNG</option>
+                  <option value="webp">WebP</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Quality <span class="qval" id="qualityVal">85</span></label>
+              <input id="quality" class="range" type="range" min="1" max="100" />
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal" style="--i: 2">
+          <div class="scanbar" id="scanbar" data-state="idle">
+            <div class="scanbar-track"><div class="scanbar-fill" id="scanFill"></div></div>
+            <div class="scanbar-meta">
+              <span id="scanLabel">Ready</span>
+              <span class="scanbar-count" id="scanCount"></span>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="save" class="btn btn-primary">Save &amp; rescan</button>
+            <button id="rescan" class="btn">Rescan now</button>
+          </div>
+        </section>
       </div>
 
-      <section>
-        <h2>Preview</h2>
-        <p>Frame URL: <code id="frameUrl"></code></p>
-        <img id="preview" alt="preview" />
-        <button id="refresh">Refresh preview</button>
-      </section>
+      <aside class="col-right reveal" style="--i: 1">
+        <section class="panel preview-panel">
+          <div class="panel-head">
+            <h2><span class="idx">03</span> Preview</h2>
+          </div>
+          <div class="frame">
+            <div class="mat">
+              <img id="preview" alt="random photo preview" />
+              <div class="frame-empty" id="frameEmpty">no frames yet</div>
+            </div>
+          </div>
+          <div class="url-block">
+            <span class="url-cap">frame url</span>
+            <div class="url-row">
+              <code id="frameUrl">—</code>
+              <button id="copy" class="icon-btn" title="Copy URL">copy</button>
+            </div>
+          </div>
+          <button id="refresh" class="btn btn-ghost btn-wide">Shuffle preview</button>
+        </section>
+      </aside>
     </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script type="module" src="./app.js"></script>
   </body>
 </html>
