@@ -1,7 +1,9 @@
 services:
   myframe:
-    build: .
-    image: myframe:latest
+    # Pull the prebuilt multi-arch image from GHCR (works on Intel & ARM Synology).
+    # To build from source on the NAS instead, comment out `image:` and use `build: .`
+    image: ghcr.io/sven97/myframe:latest
+    # build: .
     container_name: myframe
     ports:
       - "8080:8080"

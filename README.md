@@ -7,12 +7,18 @@ cloud, no Synology Photos API, no auth.
 
 ## Run (Synology / Docker)
 
-1. Edit `docker-compose.yml` — point the first volume at your photo root
-   (e.g. `/volume1/photo:/photos:ro`).
-2. `docker compose up -d --build`
+A prebuilt multi-arch image (Intel + ARM) is published to GHCR by CI on every
+push to `main`: `ghcr.io/sven97/myframe:latest`.
+
+1. Grab `docker-compose.yml` and edit the first volume to point at your photo
+   root (e.g. `/volume1/photo:/photos:ro`).
+2. `docker compose up -d` (pulls the prebuilt image — no local build needed).
+   To build from source on the NAS instead, swap the `image:` line for `build: .`.
 3. Open `http://<nas-ip>:8080`, pick folders, set orientation and your panel's
    default width/height, then **Save & rescan**.
 4. Point the frame at `http://<nas-ip>:8080/photo`.
+
+Update later with `docker compose pull && docker compose up -d`.
 
 ## Endpoints
 
