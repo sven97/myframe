@@ -20,3 +20,4 @@ Task 3: complete (HEAD 5a3b93b, review clean, +fix: discriminating EXIF-rotation
 Task 4: complete (HEAD d7e7a40, 4 tests; finished by controller after subagent hit session limit).
 Tasks 5-7: complete (selector ab950f6, browse, server). Full suite 25 tests green. Implemented directly by controller (subagents hitting session limit).
 Tasks 8-9: complete (UI 862f034, docker). Container serves /photo correctly. All 9 tasks done, 25 tests green.
+FINAL REVIEW (opus): 3 Important findings fixed + tested (retry hang, settings validation/clamp+traversal, default clamp). Minors addressed (heic documented, gitignore dedup). Suite: 30 tests green. Ready to integrate.
