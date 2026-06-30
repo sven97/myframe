@@ -22,6 +22,7 @@ export async function loadSettings(configDir) {
     return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
   } catch (err) {
     if (err.code === "ENOENT") return { ...DEFAULT_SETTINGS };
+    if (err instanceof SyntaxError) return { ...DEFAULT_SETTINGS };
     throw err;
   }
 }

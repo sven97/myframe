@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "../src/config.js";
@@ -24,5 +24,13 @@ describe("config", () => {
     expect(s.defaultWidth).toBe(800);
     // unspecified key falls back to default
     expect(s.format).toBe(DEFAULT_SETTINGS.format);
+  });
+
+  it("returns defaults when settings.json contains invalid JSON", async () => {
+    const settingsFile = join(dir, "settings.json");
+    await writeFile(settingsFile, "{ not valid json", "utf8");
+    const s = await loadSettings(dir);
+    expect(s).toEqual(DEFAULT_SETTINGS);
+    expect(s.orientation).toBe("all");
   });
 });
