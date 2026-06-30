@@ -1,6 +1,8 @@
 import express from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { createState } from "./state.js";
 import { listFoldersWithCounts, safeResolve } from "./browse.js";
 import { renderImage } from "./image.js";
@@ -64,8 +66,28 @@ function normalizeSettings(partial, root) {
   return out;
 }
 
+// Reads index.html and rewrites the asset URLs with a content hash of the JS+CSS
+// so every deploy busts browser/CDN caches (Cloudflare stamps a 4h browser TTL on
+// static files; stable filenames would otherwise serve stale app.js/style.css).
+async function buildIndexHtml() {
+  try {
+    const [html, js, css] = await Promise.all([
+      readFile(join(PUBLIC_DIR, "index.html"), "utf8"),
+      readFile(join(PUBLIC_DIR, "app.js"), "utf8"),
+      readFile(join(PUBLIC_DIR, "style.css"), "utf8"),
+    ]);
+    const v = createHash("sha1").update(js).update(css).digest("hex").slice(0, 8);
+    return html
+      .replace("./app.js", `./app.js?v=${v}`)
+      .replace("./style.css", `./style.css?v=${v}`);
+  } catch {
+    return null; // fall back to static index.html
+  }
+}
+
 export async function createApp({ root, configDir }) {
   const state = await createState({ root, configDir });
+  const indexHtml = await buildIndexHtml();
   const app = express();
   app.use(express.json());
 
@@ -156,6 +178,14 @@ export async function createApp({ root, configDir }) {
       return res.status(400).json({ error: "invalid dimensions" });
     }
     return servePhoto(req, res, width, height);
+  });
+
+  // Serve the (cache-busted) HTML with no-cache so the browser always revalidates
+  // it and picks up the freshly-versioned asset URLs.
+  app.get(["/", "/index.html"], (req, res) => {
+    if (!indexHtml) return res.sendFile(join(PUBLIC_DIR, "index.html"));
+    res.set("Cache-Control", "no-cache");
+    res.type("html").send(indexHtml);
   });
 
   app.use(express.static(PUBLIC_DIR));

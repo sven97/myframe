@@ -122,6 +122,14 @@ describe("server", () => {
     expect(res.status).toBe(400);
   });
 
+  it("serves index.html with cache-busted asset URLs and no-cache header", async () => {
+    const res = await request(app).get("/");
+    expect(res.status).toBe(200);
+    expect(res.headers["cache-control"]).toMatch(/no-cache/);
+    expect(res.text).toMatch(/\.\/app\.js\?v=[0-9a-f]{8}/);
+    expect(res.text).toMatch(/\.\/style\.css\?v=[0-9a-f]{8}/);
+  });
+
   it("rescan endpoint starts a scan and status reports completion", async () => {
     await configure({ folders: ["album"], orientation: "all" });
     const res = await request(app).post("/api/rescan");
