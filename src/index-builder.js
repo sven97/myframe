@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import sharp from "sharp";
 import { safeResolve } from "./browse.js";
@@ -29,7 +29,41 @@ async function walk(dir, recurse, exts, out) {
   }
 }
 
-export async function buildIndex({ root, folders, recurse, fileTypes }) {
+// Runs `fn` over `items` with at most `limit` in flight at once.
+async function mapLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
+  await Promise.all(workers);
+  return results;
+}
+
+/**
+ * Builds the photo index for the selected folders.
+ *
+ * @param cache  Previous cache `{ [path]: {mtime,size,width,height,orientation} }`.
+ *               Unchanged files (same mtime+size) reuse cached dimensions instead
+ *               of re-reading the image header.
+ * @param onProgress  Called as `(processed, total)` while scanning.
+ * @param concurrency Max image-header reads in flight (default 12).
+ * @returns `{ entries, cache }` — entries is `[{path,width,height,orientation}]`,
+ *          cache is the refreshed cache to persist for next time.
+ */
+export async function buildIndex({
+  root,
+  folders,
+  recurse,
+  fileTypes,
+  cache = {},
+  onProgress,
+  concurrency = 12,
+}) {
   const exts = new Set(fileTypes.map((e) => e.toLowerCase()));
   const files = [];
   for (const folder of folders) {
@@ -42,20 +76,39 @@ export async function buildIndex({ root, folders, recurse, fileTypes }) {
     await walk(dir, recurse, exts, files);
   }
 
-  const entries = [];
-  for (const path of files) {
+  const total = files.length;
+  let processed = 0;
+  const newCache = {};
+
+  const results = await mapLimit(files, concurrency, async (path) => {
     try {
-      const meta = await sharp(path).rotate().metadata();
-      if (!meta.width || !meta.height) continue;
-      entries.push({
-        path,
-        width: meta.width,
-        height: meta.height,
-        orientation: orientationOf(meta.width, meta.height),
-      });
+      const st = await stat(path);
+      const cached = cache[path];
+      let dims;
+      if (cached && cached.mtime === st.mtimeMs && cached.size === st.size) {
+        dims = {
+          width: cached.width,
+          height: cached.height,
+          orientation: cached.orientation,
+        };
+      } else {
+        const meta = await sharp(path).rotate().metadata();
+        if (!meta.width || !meta.height) return null;
+        dims = {
+          width: meta.width,
+          height: meta.height,
+          orientation: orientationOf(meta.width, meta.height),
+        };
+      }
+      newCache[path] = { mtime: st.mtimeMs, size: st.size, ...dims };
+      return { path, ...dims };
     } catch {
-      // unreadable/corrupt image: skip
+      return null; // unreadable/corrupt image or vanished file: skip
+    } finally {
+      processed++;
+      if (onProgress) onProgress(processed, total);
     }
-  }
-  return entries;
+  });
+
+  return { entries: results.filter(Boolean), cache: newCache };
 }

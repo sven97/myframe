@@ -26,7 +26,7 @@ describe("buildIndex", () => {
     await writeFile(join(root, "album", "h.png"), await makeImage({ width: 200, height: 100 }));
     await writeFile(join(root, "album", "notes.txt"), "ignore me");
 
-    const entries = await buildIndex({
+    const { entries } = await buildIndex({
       root, folders: ["album"], recurse: false, fileTypes: [".png"],
     });
 
@@ -42,10 +42,10 @@ describe("buildIndex", () => {
     await writeFile(join(root, "a", "sub", "deep.png"), await makeImage({ width: 100, height: 100 }));
 
     const flat = await buildIndex({ root, folders: ["a"], recurse: false, fileTypes: [".png"] });
-    expect(flat).toHaveLength(1);
+    expect(flat.entries).toHaveLength(1);
 
     const deep = await buildIndex({ root, folders: ["a"], recurse: true, fileTypes: [".png"] });
-    expect(deep).toHaveLength(2);
+    expect(deep.entries).toHaveLength(2);
   });
 
   it("skips Synology @eaDir and hidden subfolders when recursing", async () => {
@@ -58,7 +58,7 @@ describe("buildIndex", () => {
     );
     await writeFile(join(root, "a", ".hidden", "h.png"), await makeImage({ width: 40, height: 40 }));
 
-    const entries = await buildIndex({ root, folders: ["a"], recurse: true, fileTypes: [".png"] });
+    const { entries } = await buildIndex({ root, folders: ["a"], recurse: true, fileTypes: [".png"] });
     expect(entries).toHaveLength(1);
     expect(entries[0].path).toMatch(/real\.png$/);
   });
@@ -68,8 +68,65 @@ describe("buildIndex", () => {
     await writeFile(join(root, "x", "good.png"), await makeImage({ width: 100, height: 100 }));
     await writeFile(join(root, "x", "broken.png"), "not really a png");
 
-    const entries = await buildIndex({ root, folders: ["x"], recurse: false, fileTypes: [".png"] });
+    const { entries } = await buildIndex({ root, folders: ["x"], recurse: false, fileTypes: [".png"] });
     expect(entries).toHaveLength(1);
     expect(entries[0].path).toMatch(/good\.png$/);
+  });
+
+  it("reports progress as processed/total", async () => {
+    await mkdir(join(root, "p"), { recursive: true });
+    for (let i = 0; i < 5; i++) {
+      await writeFile(join(root, "p", `i${i}.png`), await makeImage({ width: 100, height: 100 }));
+    }
+    const calls = [];
+    const { entries } = await buildIndex({
+      root, folders: ["p"], recurse: false, fileTypes: [".png"],
+      onProgress: (processed, total) => calls.push([processed, total]),
+    });
+    expect(entries).toHaveLength(5);
+    // total is always 5; processed ends at 5
+    expect(calls.every(([, total]) => total === 5)).toBe(true);
+    expect(calls.at(-1)).toEqual([5, 5]);
+    expect(calls).toHaveLength(5);
+  });
+
+  it("returns a cache and reuses it for unchanged files (no re-read)", async () => {
+    await mkdir(join(root, "c"), { recursive: true });
+    const p = join(root, "c", "a.png");
+    await writeFile(p, await makeImage({ width: 120, height: 240 }));
+
+    const first = await buildIndex({ root, folders: ["c"], recurse: false, fileTypes: [".png"] });
+    expect(first.cache[p]).toBeDefined();
+    expect(first.cache[p].width).toBe(120);
+
+    // Tamper the cached dimensions to a sentinel. The file is untouched, so its
+    // mtime+size still match the cache — a rebuild that REUSES the cache returns
+    // the sentinel; a rebuild that re-reads the file would return 120x240.
+    first.cache[p].width = 999;
+    first.cache[p].height = 111;
+    first.cache[p].orientation = "horizontal";
+
+    const second = await buildIndex({
+      root, folders: ["c"], recurse: false, fileTypes: [".png"], cache: first.cache,
+    });
+    expect(second.entries).toHaveLength(1);
+    expect(second.entries[0].width).toBe(999); // proves the cache was used, not re-read
+    expect(second.entries[0].orientation).toBe("horizontal");
+  });
+
+  it("re-reads a file whose mtime/size changed", async () => {
+    await mkdir(join(root, "d"), { recursive: true });
+    const p = join(root, "d", "a.png");
+    await writeFile(p, await makeImage({ width: 100, height: 200 })); // vertical
+    const first = await buildIndex({ root, folders: ["d"], recurse: false, fileTypes: [".png"] });
+    expect(first.entries[0].orientation).toBe("vertical");
+
+    // Replace with a horizontal image (different content → different size/mtime)
+    await writeFile(p, await makeImage({ width: 300, height: 100 }));
+    const second = await buildIndex({
+      root, folders: ["d"], recurse: false, fileTypes: [".png"], cache: first.cache,
+    });
+    expect(second.entries[0].orientation).toBe("horizontal");
+    expect(second.entries[0].width).toBe(300);
   });
 });

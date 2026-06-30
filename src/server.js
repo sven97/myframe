@@ -2,7 +2,7 @@ import express from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createState } from "./state.js";
-import { listSubfolders, safeResolve } from "./browse.js";
+import { listFoldersWithCounts, safeResolve } from "./browse.js";
 import { renderImage } from "./image.js";
 import { DEFAULT_SETTINGS } from "./config.js";
 
@@ -70,7 +70,11 @@ export async function createApp({ root, configDir }) {
   app.use(express.json());
 
   app.get("/api/status", (req, res) => {
-    res.json({ count: state.index.length, settings: state.settings });
+    res.json({
+      count: state.index.length,
+      settings: state.settings,
+      scan: state.scanStatus,
+    });
   });
 
   app.get("/api/settings", (req, res) => {
@@ -84,22 +88,31 @@ export async function createApp({ root, configDir }) {
     } catch (err) {
       return res.status(400).json({ error: err.message });
     }
-    const count = await state.update(clean);
-    res.json({ settings: state.settings, count });
+    // Saves settings, then kicks off a background rescan (poll /api/rescan/status).
+    await state.update(clean);
+    res.json({ settings: state.settings });
   });
 
   app.get("/api/folders", async (req, res) => {
     try {
-      const folders = await listSubfolders(root, req.query.path ?? "");
+      const folders = await listFoldersWithCounts(
+        root,
+        req.query.path ?? "",
+        state.settings.fileTypes
+      );
       res.json({ folders });
     } catch {
       res.status(400).json({ error: "invalid path" });
     }
   });
 
-  app.post("/api/rescan", async (req, res) => {
-    const count = await state.rescan();
-    res.json({ count });
+  app.post("/api/rescan", (req, res) => {
+    state.startRescan();
+    res.json({ started: true });
+  });
+
+  app.get("/api/rescan/status", (req, res) => {
+    res.json(state.scanStatus);
   });
 
   async function servePhoto(req, res, width, height) {

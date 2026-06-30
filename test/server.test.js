@@ -27,19 +27,37 @@ function parseImage(r, cb) {
   r.on("end", () => cb(null, Buffer.concat(chunks)));
 }
 
+// Waits for the background rescan to finish.
+async function waitScan() {
+  for (let i = 0; i < 400; i++) {
+    const r = await request(app).get("/api/rescan/status");
+    if (!r.body.running) return r.body;
+    await new Promise((res) => setTimeout(res, 5));
+  }
+  throw new Error("scan did not finish");
+}
+
+async function configure(body) {
+  await request(app).put("/api/settings").send(body);
+  await waitScan();
+}
+
 describe("server", () => {
-  it("lists subfolders", async () => {
+  it("lists subfolders with image counts", async () => {
     const res = await request(app).get("/api/folders");
     expect(res.status).toBe(200);
-    expect(res.body.folders).toEqual(["album"]);
+    expect(res.body.folders).toEqual([{ name: "album", count: 2 }]);
   });
 
-  it("saves settings and reports indexed count", async () => {
+  it("PUT settings returns the saved settings and triggers a rescan", async () => {
     const res = await request(app)
       .put("/api/settings")
       .send({ folders: ["album"], orientation: "all" });
     expect(res.status).toBe(200);
-    expect(res.body.count).toBe(2);
+    expect(res.body.settings.folders).toEqual(["album"]);
+    await waitScan();
+    const status = await request(app).get("/api/status");
+    expect(status.body.count).toBe(2);
   });
 
   it("404 when no images are indexed yet", async () => {
@@ -48,9 +66,7 @@ describe("server", () => {
   });
 
   it("serves a photo cropped to default size after configuring folders", async () => {
-    await request(app).put("/api/settings").send({
-      folders: ["album"], orientation: "all", defaultWidth: 120, defaultHeight: 160,
-    });
+    await configure({ folders: ["album"], orientation: "all", defaultWidth: 120, defaultHeight: 160 });
     const res = await request(app).get("/photo").buffer(true).parse(parseImage);
     expect(res.status).toBe(200);
     const meta = await sharp(res.body).metadata();
@@ -59,7 +75,7 @@ describe("server", () => {
   });
 
   it("serves an explicit size and honors orientation override", async () => {
-    await request(app).put("/api/settings").send({ folders: ["album"], orientation: "all" });
+    await configure({ folders: ["album"], orientation: "all" });
     const res = await request(app).get("/photo/80/80?orientation=horizontal")
       .buffer(true).parse(parseImage);
     expect(res.status).toBe(200);
@@ -69,14 +85,13 @@ describe("server", () => {
   });
 
   it("400 on bad dimensions", async () => {
-    await request(app).put("/api/settings").send({ folders: ["album"] });
+    await configure({ folders: ["album"] });
     const res = await request(app).get("/photo/abc/100");
     expect(res.status).toBe(400);
   });
 
   it("returns 404 (does not hang) when every indexed file is unreadable", async () => {
-    await request(app).put("/api/settings").send({ folders: ["album"], orientation: "all" });
-    // Corrupt both indexed files on disk so every render fails.
+    await configure({ folders: ["album"], orientation: "all" });
     await writeFile(join(root, "album", "v.png"), "garbage");
     await writeFile(join(root, "album", "h.png"), "garbage");
     const res = await request(app).get("/photo");
@@ -89,6 +104,7 @@ describe("server", () => {
       .send({ folders: ["album"], defaultWidth: 999999, defaultHeight: 500 });
     expect(res.status).toBe(200);
     expect(res.body.settings.defaultWidth).toBe(8000);
+    await waitScan();
   });
 
   it("400 on non-positive default dimension", async () => {
@@ -104,5 +120,16 @@ describe("server", () => {
   it("rejects folders that escape the photo root", async () => {
     const res = await request(app).put("/api/settings").send({ folders: ["../../etc"] });
     expect(res.status).toBe(400);
+  });
+
+  it("rescan endpoint starts a scan and status reports completion", async () => {
+    await configure({ folders: ["album"], orientation: "all" });
+    const res = await request(app).post("/api/rescan");
+    expect(res.status).toBe(200);
+    expect(res.body.started).toBe(true);
+    const status = await waitScan();
+    expect(status.running).toBe(false);
+    expect(status).toHaveProperty("processed");
+    expect(status).toHaveProperty("total");
   });
 });
