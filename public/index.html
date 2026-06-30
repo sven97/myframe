@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MyFrame — Configuration</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>MyFrame</h1>
+      <p class="status" id="status">Loading…</p>
+
+      <section>
+        <h2>Folders</h2>
+        <ul id="folders" class="folders"></ul>
+      </section>
+
+      <section>
+        <h2>Filters &amp; output</h2>
+        <label>Orientation
+          <select id="orientation">
+            <option value="all">All</option>
+            <option value="vertical">Vertical only</option>
+            <option value="horizontal">Horizontal only</option>
+          </select>
+        </label>
+        <label>Default width <input id="defaultWidth" type="number" min="1" /></label>
+        <label>Default height <input id="defaultHeight" type="number" min="1" /></label>
+        <label>Format
+          <select id="format">
+            <option value="jpeg">JPEG</option>
+            <option value="png">PNG</option>
+            <option value="webp">WebP</option>
+          </select>
+        </label>
+        <label>Quality <input id="quality" type="number" min="1" max="100" /></label>
+      </section>
+
+      <div class="actions">
+        <button id="save">Save &amp; rescan</button>
+        <button id="rescan">Rescan now</button>
+      </div>
+
+      <section>
+        <h2>Preview</h2>
+        <p>Frame URL: <code id="frameUrl"></code></p>
+        <img id="preview" alt="preview" />
+        <button id="refresh">Refresh preview</button>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

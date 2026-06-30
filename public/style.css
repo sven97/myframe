@@ -1,0 +1,16 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; display: flex; justify-content: center; }
+main { width: min(720px, 92vw); padding: 1.5rem; }
+h1 { margin-bottom: 0.25rem; }
+.status { color: #888; margin-top: 0; }
+section { margin: 1.25rem 0; }
+.folders { list-style: none; padding: 0; max-height: 220px; overflow: auto;
+  border: 1px solid #8884; border-radius: 8px; padding: 0.5rem; }
+label { display: block; margin: 0.4rem 0; }
+input, select { font: inherit; padding: 0.25rem; }
+.actions { display: flex; gap: 0.5rem; }
+button { font: inherit; padding: 0.5rem 0.9rem; border-radius: 8px;
+  border: 1px solid #8886; cursor: pointer; }
+#preview { display: block; max-width: 100%; margin: 0.75rem 0;
+  border-radius: 8px; background: #8881; min-height: 80px; }
+code { background: #8882; padding: 0.1rem 0.3rem; border-radius: 4px; }
