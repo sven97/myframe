@@ -48,6 +48,21 @@ describe("buildIndex", () => {
     expect(deep).toHaveLength(2);
   });
 
+  it("skips Synology @eaDir and hidden subfolders when recursing", async () => {
+    await mkdir(join(root, "a", "@eaDir"), { recursive: true });
+    await mkdir(join(root, "a", ".hidden"), { recursive: true });
+    await writeFile(join(root, "a", "real.png"), await makeImage({ width: 100, height: 100 }));
+    await writeFile(
+      join(root, "a", "@eaDir", "SYNOPHOTO_THUMB_XL.png"),
+      await makeImage({ width: 40, height: 40 })
+    );
+    await writeFile(join(root, "a", ".hidden", "h.png"), await makeImage({ width: 40, height: 40 }));
+
+    const entries = await buildIndex({ root, folders: ["a"], recurse: true, fileTypes: [".png"] });
+    expect(entries).toHaveLength(1);
+    expect(entries[0].path).toMatch(/real\.png$/);
+  });
+
   it("skips unreadable image files", async () => {
     await mkdir(join(root, "x"), { recursive: true });
     await writeFile(join(root, "x", "good.png"), await makeImage({ width: 100, height: 100 }));

@@ -19,6 +19,9 @@ async function walk(dir, recurse, exts, out) {
   for (const ent of entries) {
     const full = join(dir, ent.name);
     if (ent.isDirectory()) {
+      // Skip Synology metadata (@eaDir, @tmp) and hidden dirs (.DS_Store, etc.).
+      // @eaDir holds SYNOPHOTO_THUMB_*.jpg thumbnails that must never be served.
+      if (ent.name.startsWith("@") || ent.name.startsWith(".")) continue;
       if (recurse) await walk(full, recurse, exts, out);
     } else if (exts.has(extname(ent.name).toLowerCase())) {
       out.push(full);

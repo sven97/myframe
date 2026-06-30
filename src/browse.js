@@ -24,5 +24,7 @@ export async function listSubfolders(root, relative = "") {
   return entries
     .filter((e) => e.isDirectory())
     .map((e) => e.name)
+    // Hide Synology metadata (@eaDir, @tmp) and hidden folders from the picker.
+    .filter((name) => !name.startsWith("@") && !name.startsWith("."))
     .sort();
 }

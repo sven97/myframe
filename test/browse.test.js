@@ -18,6 +18,13 @@ describe("listSubfolders", () => {
     expect(await listSubfolders(root)).toEqual(["alpha", "beta"]);
   });
 
+  it("hides Synology metadata and hidden folders", async () => {
+    await mkdir(join(root, "album"), { recursive: true });
+    await mkdir(join(root, "@eaDir"), { recursive: true });
+    await mkdir(join(root, ".hidden"), { recursive: true });
+    expect(await listSubfolders(root)).toEqual(["album"]);
+  });
+
   it("lists nested level when given a relative path", async () => {
     await mkdir(join(root, "a", "child"), { recursive: true });
     expect(await listSubfolders(root, "a")).toEqual(["child"]);
